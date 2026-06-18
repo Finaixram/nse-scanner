@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NSE Live OI Scanner — FinAI Ram</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #161b22 0%, #21262d 100%);
+    border-bottom: 1px solid #30363d;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-left h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #58a6ff;
+  }
+  .header-left p { color: #8b949e; font-size: 0.85rem; margin-top: 2px; }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .time-badge {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    color: #8b949e;
+  }
+  .refresh-btn {
+    background: #238636;
+    border: none;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+  }
+  .refresh-btn:hover { background: #2ea043; }
+
+  /* Combined signal banner */
+  .signal-banner {
+    margin: 20px 24px 0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+    border: 1px solid;
+  }
+  .signal-bull { background: #0d2311; border-color: #2ea043; color: #3fb950; }
+  .signal-bear { background: #2d1515; border-color: #f85149; color: #ff7b72; }
+  .signal-neutral { background: #1c1a0f; border-color: #d29922; color: #e3b341; }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 20px 24px;
+  }
+  @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+  /* Cards */
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-header {
+    background: #21262d;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #30363d;
+  }
+  .card-title { font-size: 1rem; font-weight: 600; }
+  .spot-price { font-size: 1.1rem; font-weight: 700; color: #58a6ff; }
+  .card-body { padding: 18px; }
+
+  /* Metrics row */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .metric {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .metric-label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .metric-value { font-size: 1.3rem; font-weight: 700; margin-top: 4px; }
+  .metric-sub { font-size: 0.72rem; color: #8b949e; margin-top: 2px; }
+  .pcr-bull { color: #3fb950; }
+  .pcr-bear { color: #ff7b72; }
+  .pcr-neutral { color: #e3b341; }
+
+  /* Bias badge */
+  .bias-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .bias-BULLISH { background: #0d2311; color: #3fb950; border: 1px solid #2ea043; }
+  .bias-BEARISH { background: #2d1515; color: #ff7b72; border: 1px solid #f85149; }
+  .bias-NEUTRAL  { background: #1c1a0f; color: #e3b341; border: 1px solid #d29922; }
+
+  /* OI table */
+  .oi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .oi-section h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8b949e;
+    margin-bottom: 8px;
+  }
+  .oi-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 8px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+  }
+  .oi-row-ce { background: rgba(248, 81, 73, 0.08); border-left: 3px solid #f85149; }
+  .oi-row-pe { background: rgba(63, 185, 80, 0.08); border-left: 3px solid #3fb950; }
+  .oi-strike { font-weight: 600; }
+  .oi-value { color: #8b949e; font-size: 0.78rem; }
+
+  /* Demo badge */
+  .demo-notice {
+    background: #1c1a0f;
+    border: 1px solid #d29922;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    color: #e3b341;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 20px;
+    color: #8b949e;
+    font-size: 0.8rem;
+    border-top: 1px solid #21262d;
+    margin-top: 10px;
+  }
+  .footer a { color: #58a6ff; text-decoration: none; }
+
+  /* Premium CTA */
+  .cta-bar {
+    background: linear-gradient(135deg, #0d2311, #132b1a);
+    border: 1px solid #2ea043;
+    border-radius: 8px;
+    padding: 16px 20px;
+    text-align: center;
+    margin: 0 24px 20px;
+  }
+  .cta-bar p { color: #3fb950; font-weight: 600; margin-bottom: 6px; }
+  .cta-bar small { color: #8b949e; font-size: 0.8rem; }
+  .cta-bar a {
+    display: inline-block;
+    background: #238636;
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 10px;
+  }
+  .cta-bar a:hover { background: #2ea043; }
+
+  /* Loading state */
+  .loading { text-align: center; padding: 40px; color: #8b949e; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #30363d; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Auto-refresh countdown */
+  #countdown { font-size: 0.75rem; color: #8b949e; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>📊 NSE Live OI Scanner</h1>
+    <p>Nifty & Bank Nifty Option Chain Analysis — Updated every 3 minutes</p>
+  </div>
+  <div class="header-right">
+    <span class="time-badge">⏱ <span id="countdown">3:00</span></span>
+    <span class="time-badge">🕐 {{ data.generated_at }}</span>
+    <button class="refresh-btn" onclick="forceRefresh()">⟳ Refresh</button>
+  </div>
+</div>
+
+<!-- Combined Signal Banner -->
+{% set sig = data.combined_signal %}
+{% if 'BULLISH' in sig %}
+<div class="signal-banner signal-bull">{{ sig }}</div>
+{% elif 'BEARISH' in sig %}
+<div class="signal-banner signal-bear">{{ sig }}</div>
+{% else %}
+<div class="signal-banner signal-neutral">{{ sig }}</div>
+{% endif %}
+
+<div class="grid">
+
+  <!-- NIFTY CARD -->
+  {% for idx_data in [data.nifty, data.banknifty] %}
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{{ idx_data.symbol }}</span>
+      <span class="spot-price">₹{{ "{:,.0f}".format(idx_data.spot_price) }}</span>
+    </div>
+    <div class="card-body">
+
+      {% if idx_data.get('is_demo') %}
+      <div class="demo-notice">⚠️ Demo data — NSE API unavailable. Run during market hours (9:15 AM – 3:30 PM IST)</div>
+      {% endif %}
+
+      <!-- Bias -->
+      {% set bias_key = 'BULLISH' if 'BULLISH' in idx_data.bias else ('BEARISH' if 'BEARISH' in idx_data.bias else 'NEUTRAL') %}
+      <div class="bias-badge bias-{{ bias_key }}">{{ idx_data.bias }}</div>
+      <p style="font-size: 0.8rem; color: #8b949e; margin-bottom: 16px;">{{ idx_data.bias_reason }}</p>
+
+      <!-- Metrics -->
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">PCR</div>
+          <div class="metric-value {% if idx_data.pcr > 1.2 %}pcr-bull{% elif idx_data.pcr < 0.8 %}pcr-bear{% else %}pcr-neutral{% endif %}">
+            {{ idx_data.pcr }}
+          </div>
+          <div class="metric-sub">Put/Call Ratio</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Max Pain</div>
+          <div class="metric-value" style="color: #e3b341;">₹{{ "{:,.0f}".format(idx_data.max_pain) }}</div>
+          <div class="metric-sub">Expiry: {{ idx_data.expiry }}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Total OI</div>
+          <div class="metric-value" style="color: #79c0ff; font-size: 1rem;">{{ "{:,.0f}".format((idx_data.total_ce_oi + idx_data.total_pe_oi) / 100000) }}L</div>
+          <div class="metric-sub">CE+PE combined</div>
+        </div>
+      </div>
+
+      <!-- Top OI Strikes -->
+      <div class="oi-grid">
+        <div class="oi-section">
+          <h4>🔴 Top CE (Resistance)</h4>
+          {% for item in idx_data.top_ce_oi %}
+          <div class="oi-row oi-row-ce">
+            <span class="oi-strike">{{ "{:,.0f}".format(item.strike) }}</span>
+            <span class="oi-value">{{ "{:,.0f}".format(item.oi / 100000) }}L OI</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="oi-section">
+          <h4>🟢 Top PE (Support)</h4>
+          {% for item in idx_data.top_pe_oi %}
+          <div class="oi-row oi-row-pe">
+            <span class="oi-strike">{{ "{:,.0f}".format(item.strike) }}</span>
+            <span class="oi-value">{{ "{:,.0f}".format(item.oi / 100000) }}L OI</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+
+<!-- AdSense Banner (uncomment after Google approval — replace IDs) -->
+<!--
+<div style="text-align:center; padding: 12px 24px;">
+  <ins class="adsbygoogle"
+       style="display:block"
+       data-ad-client="ca-pub-XXXXXXXXXXXXXXXXXX"
+       data-ad-slot="XXXXXXXXXX"
+       data-ad-format="auto"
+       data-full-width-responsive="true"></ins>
+  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+</div>
+-->
+
+<!-- Premium CTA -->
+<div class="cta-bar">
+  <p>💎 Want exact entry/SL/target signals delivered at 9:20 AM daily?</p>
+  <small>Join 500+ traders on FinAI Ram Premium — ₹999/month</small><br>
+  <a href="https://t.me/finaixram_signals" target="_blank">📱 Join Telegram Channel</a>
+</div>
+
+<div class="footer">
+  <p>⚠️ Not SEBI registered. For educational purposes only. Trade at your own risk.</p>
+  <p style="margin-top: 6px;">Built with FinAI Ram stack — <a href="https://github.com/finaixram" target="_blank">GitHub</a> | Data: NSE India</p>
+</div>
+
+<script>
+// ── Auto-refresh every 3 minutes ─────────────────────────────────────────────
+let countdown = 180;
+const countEl = document.getElementById("countdown");
+
+function tick() {
+  countdown--;
+  if (countdown <= 0) {
+    forceRefresh();
+    return;
+  }
+  const m = Math.floor(countdown / 60);
+  const s = countdown % 60;
+  countEl.textContent = `${m}:${s.toString().padStart(2, "0")}`;
+  setTimeout(tick, 1000);
+}
+
+function forceRefresh() {
+  document.querySelector(".refresh-btn").textContent = "⟳ Loading...";
+  fetch("/api/data")
+    .then(r => r.json())
+    .then(d => { window.location.reload(); })
+    .catch(() => window.location.reload());
+}
+
+// Start countdown
+setTimeout(tick, 1000);
+</script>
+</body>
+</html>
