@@ -1,0 +1,45 @@
+name: NSE Telegram Signals
+
+on:
+  schedule:
+    - cron: '15 3 * * 1-5'
+    - cron: '45 3 * * 1-5'
+    - cron: '15 4 * * 1-5'
+    - cron: '45 4 * * 1-5'
+    - cron: '15 5 * * 1-5'
+    - cron: '45 5 * * 1-5'
+    - cron: '15 6 * * 1-5'
+    - cron: '45 6 * * 1-5'
+    - cron: '15 7 * * 1-5'
+    - cron: '45 7 * * 1-5'
+    - cron: '15 8 * * 1-5'
+    - cron: '45 8 * * 1-5'
+    - cron: '15 9 * * 1-5'
+    - cron: '45 9 * * 1-5'
+    - cron: '0 10 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  signal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install deps
+        run: pip install requests yfinance flask --break-system-packages -q
+
+      - name: Send signal alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python signal_cron.py
+
+      - name: Commit state
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add last_signal.txt || true
+          git diff --staged --quiet || git commit -m "chore: state [skip ci]"
+          git push || true
