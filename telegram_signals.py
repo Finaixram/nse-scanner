@@ -1,1 +1,113 @@
-#!/usr/bin/env python3\n"""Poll NSE scanner /api/signal every 30min during market hours. Alert on bias change."""\nimport time, json, urllib.request, datetime\n\nBOT = "8798747663:AAERtT14sv1oS8msRHVlGgky4fZpfOBydFM"\nCHAT = "1332778697"\nURL = "https://nse-scanner-bz8s.onrender.com/api/signal"\n\ndef tg(msg):\n    data = json.dumps({"chat_id":CHAT,"text":msg,"parse_mode":"HTML"}).encode()\n    req = urllib.request.Request(f"https://api.telegram.org/bot{BOT}/sendMessage",\n                                  data=data,headers={"Content-Type":"application/json"})\n    urllib.request.urlopen(req,timeout=10)\n\ndef market_open():\n    n = datetime.datetime.now()\n    # Rough IST check (UTC+5:30)\n    utc_h, utc_m = n.hour, n.minute\n    ist_mins = utc_h*60 + utc_m + 330\n    ist_mins %= 1440\n    return 555 <= ist_mins <= 930  # 9:15 AM to 3:30 PM IST\n\nlast = None\nprint("NSE Telegram signals started. URL:", URL)\nwhile True:\n    try:\n        if market_open():\n            with urllib.request.urlopen(URL, timeout=15) as r:\n                d = json.loads(r.read())\n            sig = d.get("signal","SKIP")\n            if sig != "SKIP" and sig != last:\n                emoji = {"BULLISH":"🟢","BEARISH":"🔴","NEUTRAL":"🟡","BULLISH_PARTIAL":"📈","BEARISH_PARTIAL":"📉"}.get(sig,"⚪")\n                msg = (f"{emoji} <b>NSE Bias: {sig}</b>\n"\n                       f"PCR: {d.get("pcr","N/A")} | Max Pain: {d.get("max_pain","N/A")}\n"\n                       f"Spot: {d.get("spot","N/A")} | {d.get("timestamp","")}")\n                tg(msg)\n                print(f"Sent: {sig}")\n                last = sig\n    except Exception as e:\n        print(f"Error: {e}")\n    time.sleep(1800)
+"""
+telegram_signals.py
+===================
+Polls /api/data every 30 min during market hours and sends Telegram
+alerts when bias CHANGES. Skips is_demo=True or success=False data.
+
+Env vars: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, SCANNER_URL
+"""
+
+import os, time, datetime, urllib.request, json
+
+TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN",   "8798747663:AAERtT14sv1oS8msRHVlGgky4fZpfOBydFM")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "1332778697")
+SCANNER_URL      = os.environ.get("SCANNER_URL",      "https://nse-scanner-bz8s.onrender.com")
+POLL_SECONDS     = 30 * 60
+
+_MARKET_OPEN  = (9, 15)
+_MARKET_CLOSE = (15, 30)
+_last_bias    = {"nifty": None, "banknifty": None}
+
+
+def _ist_now():
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+
+
+def _is_market_open():
+    now = _ist_now()
+    if now.weekday() >= 5:
+        return False
+    cur       = now.hour * 60 + now.minute
+    open_min  = _MARKET_OPEN[0]  * 60 + _MARKET_OPEN[1]
+    close_min = _MARKET_CLOSE[0] * 60 + _MARKET_CLOSE[1]
+    return open_min <= cur <= close_min
+
+
+def _send_tg(text):
+    try:
+        url  = "https://api.telegram.org/bot" + TELEGRAM_TOKEN + "/sendMessage"
+        body = json.dumps({"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"}).encode()
+        req  = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"[TG] Error: {e}")
+
+
+def _fetch_data():
+    try:
+        url  = SCANNER_URL.rstrip("/") + "/api/data"
+        resp = urllib.request.urlopen(url, timeout=20)
+        return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[Poll] Fetch error: {e}")
+        return None
+
+
+def _bias_key(s):
+    s = (s or "").upper()
+    for kw in ("BULLISH", "BEARISH", "NEUTRAL", "UNAVAILABLE"):
+        if kw in s: return kw
+    return "UNKNOWN"
+
+
+def _check_and_alert():
+    data = _fetch_data()
+    if not data: return
+    for key, label in [("nifty", "Nifty 50"), ("banknifty", "Bank Nifty")]:
+        idx = data.get(key, {})
+        if idx.get("is_demo") or not idx.get("success"):
+            continue
+        bias_raw = idx.get("bias", "")
+        bkey     = _bias_key(bias_raw)
+        prev     = _last_bias[key]
+        if prev is None:
+            _last_bias[key] = bkey
+            print(f"[Poll] {label}: initial bias = {bkey}")
+            continue
+        if bkey != prev:
+            msg = (
+                "\U0001f514 <b>BIAS CHANGE \u2014 " + label + "</b>\n\n"
+                + prev + " \u27a1 " + bias_raw + "\n\n"
+                + "Spot: <b>" + str(idx.get("spot_price")) + "</b>  |  PCR: <b>" + str(idx.get("pcr")) + "</b>\n"
+                + "Max Pain: <b>" + str(idx.get("max_pain")) + "</b>\n"
+                + str(idx.get("bias_reason", "")) + "\n\n"
+                + "Source: " + str(idx.get("source", "unknown")) + "\n"
+                + "\U0001f550 " + _ist_now().strftime("%d %b %Y %H:%M IST")
+            )
+            _send_tg(msg)
+            _last_bias[key] = bkey
+        else:
+            print(f"[Poll] {label}: no change ({bkey})")
+
+
+def run():
+    print("[NSE Signal Bot] Starting.")
+    _send_tg(
+        "\U0001f680 <b>NSE Signal Bot started</b>\n"
+        "Watching Nifty 50 + Bank Nifty for bias changes.\n"
+        "Alerts fire on NEUTRAL \u2194 BULLISH \u2194 BEARISH transitions."
+    )
+    while True:
+        try:
+            if _is_market_open():
+                print(f"[Poll] {_ist_now().strftime('%H:%M IST')} - checking...")
+                _check_and_alert()
+            else:
+                print(f"[Poll] {_ist_now().strftime('%H:%M IST')} - market closed.")
+        except Exception as e:
+            print(f"[Poll] error: {e}")
+        time.sleep(POLL_SECONDS)
+
+
+if __name__ == "__main__":
+    run()
