@@ -1,4 +1,4 @@
 flask==3.0.3
 gunicorn==22.0.0
-nsepython
-yfinance
+yfinance>=0.2.38
+pandas>=1.5.0
