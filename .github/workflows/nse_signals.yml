@@ -19,9 +19,14 @@ on:
     - cron: '0 10 * * 1-5'
   workflow_dispatch:
 
+concurrency:
+  group: nse-signals
+  cancel-in-progress: true
+
 jobs:
   signal:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +38,7 @@ jobs:
       - name: Send signal alert
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHAT_ID: "-1004428117809"
         run: python signal_cron.py
 
       - name: Commit state
