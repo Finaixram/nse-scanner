@@ -3,3 +3,5 @@ gunicorn==22.0.0
 yfinance>=0.2.55
 curl_cffi>=0.7.0
 pandas>=1.5.0
+requests>=2.31.0
+nsepython
