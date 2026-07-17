@@ -181,9 +181,28 @@ def fetch_index_kite(kite_name, kite_spot):
 # Source 2: nsepython (direct NSE scrape, no daily token, was already written
 # in scrape_oi.py but never wired into this app - the code below mirrors that
 # logic against app.py's own return shape).
+#
+# CONFIRMED 2026-07-16: NSE's robots.txt disallows /api/ for every user-agent,
+# and nseindia.com actively firewalls requests from cloud/datacenter IP ranges
+# (AWS, GCP, and by extension Render, which runs on AWS) - this is a
+# deliberate, years-old NSE policy per the nsepython maintainer's own forum
+# thread (forum.unofficed.com/t/.../670), not a bug in this code or in
+# nsepython. It cannot be fixed with headers, cookies, retries, or timeouts.
+# It only works from a residential/non-datacenter IP. Disabled by default on
+# Render (set NSEPYTHON_ENABLED=true to force it on, e.g. if this app is ever
+# run from a home/residential host instead) so it doesn't burn a request
+# timeout on every single call for a source that structurally cannot succeed
+# here, and so it doesn't add to NSE's incentive to tighten blocking further.
 # ---------------------------------------------------------------------------
 
+NSEPYTHON_ENABLED = os.environ.get("NSEPYTHON_ENABLED", "false").lower() == "true"
+
+
 def fetch_index_nsepython(nse_name):
+    if not NSEPYTHON_ENABLED:
+        raise RuntimeError("nsepython: disabled on this host (NSE blocks cloud/datacenter IPs - "
+                            "set NSEPYTHON_ENABLED=true only if running from a residential IP)")
+
     from nsepython import nse_optionchain_scrapper
 
     data = nse_optionchain_scrapper(nse_name)
